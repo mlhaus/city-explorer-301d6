@@ -9,12 +9,17 @@ const app = express(); //
 const PORT = process.env.PORT || 3000; //
 
 // Route Definitions
-app.use(express.static('./public'));
+// app.use(express.static('./public'));
+app.get('/', rootHandler);
 app.get('/greet', greetHandler);
 app.get('/data', dataHandler);
 app.use('*', notFoundHandler);
 
 // Route Handlers
+function rootHandler(request, response) {
+  response.status(200).send('City Explorer back-end');
+}
+
 function greetHandler(request, response) {
   response.status(200).send('Hello World!');
 }
