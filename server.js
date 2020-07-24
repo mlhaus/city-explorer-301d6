@@ -30,7 +30,7 @@ function locationHandler(request, response) {
 }
 
 function notFoundHandler(request, response) {
-  response.status(404).send('404 - Not Found');
+  response.status(404).json({ notFound: true });
 }
 
 function errorHandler(error, request, response, next) {
