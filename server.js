@@ -13,7 +13,9 @@ const PORT = process.env.PORT || 3000; //
 app.get('/', rootHandler);
 app.get('/greet', greetHandler);
 app.get('/data', dataHandler);
+app.get('/bad', (request, response) => { throw new Error('Sorry the the inconvenience.') });
 app.use('*', notFoundHandler);
+app.use(errorHandler);
 
 // Route Handlers
 function rootHandler(request, response) {
@@ -42,6 +44,10 @@ function dataHandler(request, response) {
 
 function notFoundHandler(request, response) {
   response.status(404).send('404 - Not Found');
+}
+
+function errorHandler(error, request, response, next) {
+  response.status(500).json({ error: true, message: error.message });
 }
 
 // App listener
