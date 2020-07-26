@@ -32,10 +32,10 @@ function locationHandler(request, response) {
       q: city,
       format: 'json'
     })
-    .then(locationResponse => {
-      const geoData = locationResponse.body;
-      const location = new Location(city, geoData);
-      response.status(200).send(location);
+    .then(locationIQResponse => {
+      const topLocation = locationIQResponse.body[0];
+      const myLocationResponse = new Location(city, topLocation);
+      response.status(200).send(myLocationResponse);
     })
     .catch(err => {
       console.log(err);
@@ -44,18 +44,32 @@ function locationHandler(request, response) {
 }
 
 function restaurantHandler(request, response) {
-  // const queryString = request.query;
-  // const lat = request.query.latitude;
-  // const lon = request.query.longitude;
-  // console.log(queryString);
-  // console.log(lat, lon);
-  const restaurantsData = require('./data/restaurants.json');
-  const arrayOfRestaurants = restaurantsData.nearby_restaurants;
-  const restaurantsResults = [];
-  arrayOfRestaurants.forEach(restaurantObj => {
-    restaurantsResults.push(new Restaurant(restaurantObj));
-  });
-  response.send(restaurantsResults);
+  const lat = parseFloat(request.query.latitude); //
+  const lon = parseFloat(request.query.longitude); //
+  const currentPage = request.query.page; //
+  const numPerPage = 4; //
+  const start = ((currentPage - 1) * numPerPage + 1); //
+  const url = 'https://api.yelp.com/v3/businesses/search';
+  superagent.get(url)
+    .query({
+      latitude: lat,
+      longitude: lon,
+      limit: numPerPage,
+      offset: start
+    })
+    .set('Authorization', `Bearer ${process.env.YELP_KEY}`)
+    .then(yelpResponse => {
+      const arrayOfRestaurants = yelpResponse.body.businesses;
+      const restaurantsResults = [];
+      arrayOfRestaurants.forEach(restaurantObj => {
+        restaurantsResults.push(new Restaurant(restaurantObj));
+      });
+      response.send(restaurantsResults);
+    })
+    .catch(err => {
+      console.log(err);
+      errorHandler(err, request, response);
+    });
 }
 
 function notFoundHandler(request, response) {
@@ -67,19 +81,19 @@ function errorHandler(error, request, response, next) {
 }
 
 // Constructors
-function Location(city, locationData) {
+function Location(city, location) {
   this.search_query = city;
-  this.formatted_query = locationData[0].display_name;
-  this.latitude = parseFloat(locationData[0].lat);
-  this.longitude = parseFloat(locationData[0].lon);
+  this.formatted_query = location.display_name;
+  this.latitude = parseFloat(location.lat);
+  this.longitude = parseFloat(location.lon);
 }
 
 function Restaurant(obj) {
-  this.name = obj.restaurant.name;
-  this.url = obj.restaurant.url;
-  this.rating = obj.restaurant.user_rating.aggregate_rating;
-  this.price = obj.restaurant.price_range;
-  this.image_url = obj.restaurant.featured_image;
+  this.name = obj.name;
+  this.url = obj.url;
+  this.rating = obj.rating;
+  this.price = obj.price;
+  this.image_url = obj.image_url;
 }
 
 // App listener
