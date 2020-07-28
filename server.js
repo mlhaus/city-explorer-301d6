@@ -34,7 +34,6 @@ function locationHandler(request, response) {
   const city = request.query.city.toLowerCase().trim();
   getLocationData(city)
     .then(locationData => {
-      console.log('Hello from line 37', locationData);
       response.status(200).send(locationData);
     })
     .catch(err => {
@@ -52,14 +51,14 @@ function getLocationData(city) {
         return results.rows[0];
       } else {
         const url = 'https://us1.locationiq.com/v1/search.php';
-        superagent.get(url)
+        return superagent.get(url)
           .query({
             key: process.env.LOCATION_KEY,
             q: city,
             format: 'json'
           })
           .then((data) => {
-            setLocationData(city, data.body[0]);
+            return setLocationData(city, data.body[0]);
           });
       }
     });
@@ -75,7 +74,7 @@ function setLocationData(city, locationData) {
   const values = [city, location.formatted_query, location.latitude, location.longitude];
   return client.query(SQL, values)
     .then(results => {
-      results.rows[0]
+      return results.rows[0];
     });
 }
 
