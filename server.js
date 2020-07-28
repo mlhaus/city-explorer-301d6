@@ -5,11 +5,17 @@ require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
 const superagent = require('superagent');
+const pg = require('pg');
 
 // Application Setup
 const app = express();
 const PORT = process.env.PORT;
 app.use(cors());
+if(!process.env.DATABASE_URL) {
+  throw new Error('Missing database URL.');
+}
+const client = new pg.Client(process.env.DATABASE_URL);
+client.on('error', err => { throw err; });
 
 // Route Definitions
 app.get('/', rootHandler);
@@ -24,39 +30,52 @@ function rootHandler(request, response) {
   response.status(200).send('City Explorer back-end');
 }
 
-const locationCache = {};
-
-function getLocationFromCache(city) {
-  return locationCache[city];
-}
-
-function setLocationInCache(city, location) {
-  locationCache[city] = location;
-}
-
 function locationHandler(request, response) {
   const city = request.query.city.toLowerCase().trim();
-  const locationFromCache = getLocationFromCache(city);
-  if(locationFromCache) {
-    response.send(locationFromCache);
-    return;
-  }
-  const url = 'https://us1.locationiq.com/v1/search.php';
-  superagent.get(url)
-    .query({
-      key: process.env.LOCATION_KEY,
-      q: city,
-      format: 'json'
-    })
-    .then(locationIQResponse => {
-      const topLocation = locationIQResponse.body[0];
-      const myLocationResponse = new Location(city, topLocation);
-      setLocationInCache(city, myLocationResponse);
-      response.status(200).send(myLocationResponse);
+  getLocationData(city)
+    .then(locationData => {
+      console.log('Hello from line 37', locationData);
+      response.status(200).send(locationData);
     })
     .catch(err => {
       console.log(err);
       errorHandler(err, request, response);
+    });
+}
+
+function getLocationData(city) {
+  const SQL = 'SELECT * FROM locations WHERE search_query = $1';
+  const values = [city];
+  return client.query(SQL, values)
+    .then((results) => {
+      if(results.rowCount) {
+        return results.rows[0];
+      } else {
+        const url = 'https://us1.locationiq.com/v1/search.php';
+        superagent.get(url)
+          .query({
+            key: process.env.LOCATION_KEY,
+            q: city,
+            format: 'json'
+          })
+          .then((data) => {
+            setLocationData(city, data.body[0]);
+          });
+      }
+    });
+}
+
+function setLocationData(city, locationData) {
+  const location = new Location(city, locationData);
+  const SQL = `
+    INSERT INTO locations (search_query, formatted_query, latitude, longitude)
+    VALUES ($1, $2, $3, $4)
+    RETURNING *;
+  `;
+  const values = [city, location.formatted_query, location.latitude, location.longitude];
+  return client.query(SQL, values)
+    .then(results => {
+      results.rows[0]
     });
 }
 
@@ -89,38 +108,10 @@ function restaurantHandler(request, response) {
     });
 }
 
-const forecastCache = {};
-
-function getForecastsFromCache(city) {
-  console.log('Current forecast cache state:', forecastCache);
-  const cacheEntry = forecastCache[city];
-  if(cacheEntry) {
-    if(cacheEntry.cacheTime < Date.now() - 5000) {
-      delete locationCache[city];
-      return null;
-    }
-    return cacheEntry.forecasts;
-  }
-  return null;
-}
-
-function setForecastsInCache(city, forecasts) {
-  forecastCache[city] = {
-    cacheTime: new Date(),
-    forecasts
-  };
-  console.log('Updated forecast cache state:', forecastCache);
-}
-
 function weatherHandler(request, response) {
   const lat = parseFloat(request.query.latitude);
   const lon = parseFloat(request.query.longitude);
   const city = request.query.search_query;
-  const forecastsFromCache = getForecastsFromCache(city);
-  if(forecastsFromCache) {
-    response.send(forecastsFromCache);
-    return;
-  }
   const url = 'https://api.weatherbit.io/v2.0/forecast/daily';
   superagent.get(url)
     .query({
@@ -134,7 +125,6 @@ function weatherHandler(request, response) {
       arrayOfForecasts.forEach(forecastObj => {
         forecastsResults.push(new Forecast(forecastObj));
       });
-      setForecastsInCache(city, forecastsResults);
       response.send(forecastsResults);
     })
     .catch(err => {
@@ -173,4 +163,11 @@ function Forecast(obj) {
 }
 
 // App listener
-app.listen(PORT,() => console.log(`Listening on port ${PORT}`));
+client.connect()
+  .then(() => {
+    console.log('Postgres connected.');
+    app.listen(PORT,() => console.log(`Listening on port ${PORT}`));
+  })
+  .catch(err => {
+    throw `Postgres error: ${err.message}`;
+  });
