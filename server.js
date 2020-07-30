@@ -4,13 +4,12 @@
 require('dotenv').config();
 const express = require('express');
 const cors = require('cors');
-const superagent = require('superagent');
-
 
 // Our Dependencies
 const client = require('./modules/client');
 const getLocationData = require('./modules/location');
 const getRestaurantData = require('./modules/yelp');
+const getWeatherData = require('./modules/weather');
 
 // Application Setup
 const app = express();
@@ -57,23 +56,12 @@ function restaurantHandler(request, response) {
 }
 
 function weatherHandler(request, response) {
-  const lat = parseFloat(request.query.latitude);
-  const lon = parseFloat(request.query.longitude);
-  const city = request.query.search_query;
-  const url = 'https://api.weatherbit.io/v2.0/forecast/daily';
-  superagent.get(url)
-    .query({
-      key: process.env.WEATHER_KEY,
-      lat: lat,
-      lon: lon,
-    })
-    .then(weatherBitResponse => {
-      const arrayOfForecasts = weatherBitResponse.body.data;
-      const forecastsResults = [];
-      arrayOfForecasts.forEach(forecastObj => {
-        forecastsResults.push(new Forecast(forecastObj));
-      });
-      response.send(forecastsResults);
+  const lat = request.query.latitude;
+  const lon = request.query.longitude;
+  getWeatherData(lat, lon)
+    .then(weatherData => {
+      console.log('Hello from line 63', weatherData);
+      response.send(200).send(weatherData);
     })
     .catch(err => {
       console.log(err);
@@ -87,12 +75,6 @@ function notFoundHandler(request, response) {
 
 function errorHandler(error, request, response, next) {
   response.status(500).json({ error: true, message: error.message });
-}
-
-// Constructors
-function Forecast(obj) {
-  this.forecast = obj.weather.description;
-  this.time = obj.datetime;
 }
 
 // App listener

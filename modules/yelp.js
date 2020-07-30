@@ -17,8 +17,11 @@ function getRestaurantData(lat, lon, currentPage) {
     .then(yelpResponse => {
       const arrayOfRestaurants = yelpResponse.body.businesses;
       const restaurantsResults = arrayOfRestaurants.map(restaurantObj => new Restaurant(restaurantObj));
-      return restaurantsResults;
+      return Promise.resolve(restaurantsResults);
     })
+    .catch(err => {
+      return Promise.reject(err);
+    });
 }
 
 function Restaurant(obj) {
