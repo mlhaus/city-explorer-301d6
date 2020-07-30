@@ -60,8 +60,7 @@ function weatherHandler(request, response) {
   const lon = request.query.longitude;
   getWeatherData(lat, lon)
     .then(weatherData => {
-      console.log('Hello from line 63', weatherData);
-      response.send(200).send(weatherData);
+      response.status(200).send(weatherData);
     })
     .catch(err => {
       console.log(err);
