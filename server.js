@@ -10,6 +10,7 @@ const superagent = require('superagent');
 // Our Dependencies
 const client = require('./modules/client');
 const getLocationData = require('./modules/location');
+const getRestaurantData = require('./modules/yelp');
 
 // Application Setup
 const app = express();
@@ -42,27 +43,12 @@ function locationHandler(request, response) {
 }
 
 function restaurantHandler(request, response) {
-  const lat = parseFloat(request.query.latitude);
-  const lon = parseFloat(request.query.longitude);
+  const lat = request.query.latitude;
+  const lon = request.query.longitude;
   const currentPage = request.query.page;
-  const numPerPage = 4;
-  const start = ((currentPage - 1) * numPerPage + 1);
-  const url = 'https://api.yelp.com/v3/businesses/search';
-  superagent.get(url)
-    .query({
-      latitude: lat,
-      longitude: lon,
-      limit: numPerPage,
-      offset: start
-    })
-    .set('Authorization', `Bearer ${process.env.YELP_KEY}`)
-    .then(yelpResponse => {
-      const arrayOfRestaurants = yelpResponse.body.businesses;
-      const restaurantsResults = [];
-      arrayOfRestaurants.forEach(restaurantObj => {
-        restaurantsResults.push(new Restaurant(restaurantObj));
-      });
-      response.send(restaurantsResults);
+  getRestaurantData(lat, lon, currentPage)
+    .then(restaurantData => {
+      response.status(200).send(restaurantData);
     })
     .catch(err => {
       console.log(err);
@@ -104,16 +90,6 @@ function errorHandler(error, request, response, next) {
 }
 
 // Constructors
-
-
-function Restaurant(obj) {
-  this.name = obj.name;
-  this.url = obj.url;
-  this.rating = obj.rating;
-  this.price = obj.price;
-  this.image_url = obj.image_url;
-}
-
 function Forecast(obj) {
   this.forecast = obj.weather.description;
   this.time = obj.datetime;

@@ -35,7 +35,7 @@ function setLocationData(city, locationData) {
   const values = [city, location.formatted_query, location.latitude, location.longitude];
   return client.query(SQL, values)
     .then(results => {
-      results.rows[0]
+      results.rows[0];
     });
 }
 
